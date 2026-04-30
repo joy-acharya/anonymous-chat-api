@@ -4,6 +4,7 @@ import { RedisModule } from './redis/redis.module';
 import { AuthModule } from './modules/auth/auth.module';
 import { RoomsModule } from './modules/rooms/rooms.module';
 import { MessagesModule } from './modules/messages/messages.module';
+import { ChatModule } from './modules/chat/chat.module';
 
 @Module({
   imports: [
@@ -14,6 +15,7 @@ import { MessagesModule } from './modules/messages/messages.module';
     AuthModule,
     RoomsModule,
     MessagesModule,
+    ChatModule,
   ],
 })
 export class AppModule {}
