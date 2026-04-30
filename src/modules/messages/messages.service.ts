@@ -5,9 +5,11 @@ import { db } from '../../db/db';
 import { messages, rooms } from '../../db/schema';
 import { ApiException } from '../../common/exceptions/api.exception';
 import { AuthUser } from '../auth/types';
+import { RedisService } from '../../redis/redis.service';
 
 @Injectable()
 export class MessagesService {
+  constructor(private readonly redisService: RedisService) {}
   async findByRoom(roomId: string, limit = 50, before?: string) {
     const room = await this.findRoomOrFail(roomId);
 
@@ -91,13 +93,29 @@ export class MessagesService {
 
     const message = insertedMessages[0];
 
-    return {
+    const responseMessage = {
       id: message.id,
       roomId: message.roomId,
       username: message.username,
       content: message.content,
       createdAt: message.createdAt.toISOString(),
     };
+
+    await this.redisService.getClient().publish(
+      'chat:events',
+      JSON.stringify({
+        event: 'message:new',
+        roomId: room.id,
+        payload: {
+          id: responseMessage.id,
+          username: responseMessage.username,
+          content: responseMessage.content,
+          createdAt: responseMessage.createdAt,
+        },
+      }),
+    );
+
+    return responseMessage;
   }
 
   private async findRoomOrFail(roomId: string) {
