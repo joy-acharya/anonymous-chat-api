@@ -13,16 +13,24 @@ import { db } from '../../db/db';
 import { rooms } from '../../db/schema';
 import { RedisService } from '../../redis/redis.service';
 
-type RedisChatEvent = {
-  event: 'message:new';
-  roomId: string;
-  payload: {
-    id: string;
-    username: string;
-    content: string;
-    createdAt: string;
-  };
-};
+type RedisChatEvent =
+  | {
+      event: 'message:new';
+      roomId: string;
+      payload: {
+        id: string;
+        username: string;
+        content: string;
+        createdAt: string;
+      };
+    }
+  | {
+      event: 'room:deleted';
+      roomId: string;
+      payload: {
+        roomId: string;
+      };
+    };
 
 @WebSocketGateway({
   namespace: '/chat',
@@ -46,6 +54,10 @@ export class ChatGateway implements OnGatewayConnection, OnGatewayDisconnect {
 
       if (event.event === 'message:new') {
         this.server.to(event.roomId).emit('message:new', event.payload);
+      }
+
+      if (event.event === 'room:deleted') {
+        this.server.to(event.roomId).emit('room:deleted', event.payload);
       }
     });
   }

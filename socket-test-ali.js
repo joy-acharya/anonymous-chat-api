@@ -1,8 +1,8 @@
 const { io } = require('socket.io-client');
 
 const token =
-  '9ce0a7c2b58e8acd79222d9499ae10c34c237ac37704ef519f8d1a582bc4a397';
-const roomId = 'room_17ff5756';
+  'af6229861b56d7f246bda65b57bad6d4f550d32fd37789e92736659923d582fb';
+const roomId = 'room_e1164da7';
 
 const socket = io('http://localhost:3000/chat', {
   transports: ['websocket'],
@@ -14,4 +14,5 @@ socket.on('room:joined', (data) => console.log('room:joined', data));
 socket.on('room:user_joined', (data) => console.log('room:user_joined', data));
 socket.on('room:user_left', (data) => console.log('room:user_left', data));
 socket.on('message:new', (data) => console.log('message:new', data));
+socket.on('room:deleted', (data) => console.log('room:deleted', data));
 socket.on('disconnect', () => console.log('ali disconnected'));
