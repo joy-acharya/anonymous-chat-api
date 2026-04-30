@@ -8,7 +8,7 @@ import {
   WebSocketServer,
 } from '@nestjs/websockets';
 import type { Server, Socket } from 'socket.io';
-import { eq, and } from 'drizzle-orm';
+import { and, eq } from 'drizzle-orm';
 import { db } from '../../db/db';
 import { rooms } from '../../db/schema';
 import { RedisService } from '../../redis/redis.service';
@@ -64,7 +64,10 @@ export class ChatGateway implements OnGatewayConnection, OnGatewayDisconnect {
     }
 
     if (!roomId) {
-      client.emit('error', { code: 404, message: 'Room not found' });
+      client.emit('error', {
+        code: 404,
+        message: 'Room not found',
+      });
       client.disconnect(true);
       return;
     }
@@ -87,7 +90,10 @@ export class ChatGateway implements OnGatewayConnection, OnGatewayDisconnect {
       .limit(1);
 
     if (!roomRows[0]) {
-      client.emit('error', { code: 404, message: 'Room not found' });
+      client.emit('error', {
+        code: 404,
+        message: 'Room not found',
+      });
       client.disconnect(true);
       return;
     }
@@ -99,13 +105,33 @@ export class ChatGateway implements OnGatewayConnection, OnGatewayDisconnect {
 
     await client.join(roomId);
 
+    const activeUsersKey = this.getActiveUsersKey(roomId);
+
+    await this.redisService.getClient().sadd(activeUsersKey, user.username);
+
+    await this.redisService
+      .getClient()
+      .set(
+        this.getSocketKey(client.id),
+        JSON.stringify({ roomId, username: user.username }),
+      );
+
+    const activeUsers = await this.redisService
+      .getClient()
+      .smembers(activeUsersKey);
+
     client.emit('room:joined', {
-      activeUsers: [user.username],
+      activeUsers,
+    });
+
+    client.to(roomId).emit('room:user_joined', {
+      username: user.username,
+      activeUsers,
     });
   }
 
   async handleDisconnect(client: Socket) {
-    await client.leave(client.data.roomId);
+    await this.removeUserFromRoom(client);
   }
 
   @SubscribeMessage('room:leave')
@@ -113,6 +139,47 @@ export class ChatGateway implements OnGatewayConnection, OnGatewayDisconnect {
     @ConnectedSocket() client: Socket,
     @MessageBody() _body: unknown,
   ) {
+    await this.removeUserFromRoom(client);
     client.disconnect(true);
+  }
+
+  private async removeUserFromRoom(client: Socket) {
+    const socketStateRaw = await this.redisService
+      .getClient()
+      .get(this.getSocketKey(client.id));
+
+    if (!socketStateRaw) {
+      return;
+    }
+
+    const socketState = JSON.parse(socketStateRaw) as {
+      roomId: string;
+      username: string;
+    };
+
+    const activeUsersKey = this.getActiveUsersKey(socketState.roomId);
+
+    await this.redisService
+      .getClient()
+      .srem(activeUsersKey, socketState.username);
+
+    await this.redisService.getClient().del(this.getSocketKey(client.id));
+
+    const activeUsers = await this.redisService
+      .getClient()
+      .smembers(activeUsersKey);
+
+    client.to(socketState.roomId).emit('room:user_left', {
+      username: socketState.username,
+      activeUsers,
+    });
+  }
+
+  private getActiveUsersKey(roomId: string) {
+    return `room:${roomId}:active_users`;
+  }
+
+  private getSocketKey(socketId: string) {
+    return `socket:${socketId}`;
   }
 }
