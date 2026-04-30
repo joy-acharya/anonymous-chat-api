@@ -1,7 +1,10 @@
-import { IsString, Length } from 'class-validator';
+import { IsString, Matches } from 'class-validator';
 
 export class CreateRoomDto {
   @IsString()
-  @Length(1, 100)
+  @Matches(/^[a-zA-Z0-9-]{3,32}$/, {
+    message:
+      'name must be between 3 and 32 characters and contain only letters, numbers, and hyphens',
+  })
   name!: string;
 }

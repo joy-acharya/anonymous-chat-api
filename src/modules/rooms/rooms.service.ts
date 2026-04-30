@@ -12,12 +12,13 @@ export class RoomsService {
   constructor(private readonly redisService: RedisService) {}
 
   async create(name: string, user: AuthUser) {
+    const trimmedName = name.trim();
     const id = `room_${randomBytes(4).toString('hex')}`;
 
     const existingRoom = await db
       .select()
       .from(rooms)
-      .where(and(eq(rooms.name, name), eq(rooms.isDeleted, false)))
+      .where(and(eq(rooms.name, trimmedName), eq(rooms.isDeleted, false)))
       .limit(1);
 
     if (existingRoom[0]) {
@@ -32,7 +33,7 @@ export class RoomsService {
       .insert(rooms)
       .values({
         id,
-        name,
+        name: trimmedName,
         createdBy: user.username,
       })
       .returning();
